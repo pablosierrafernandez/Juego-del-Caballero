@@ -1,13 +1,15 @@
 
 
+
 # Doc
 
 Este es un juego de red implementado como una aplicación cliente/servidor en lenguaje C. El juego se llama "Juego del Caballero", y el objetivo es llevar un Datagrama IP desde un punto a otro en un tablero esquivando obstáculos. Tanto el cliente como el servidor funcionan como programas de terminal y se comunican mediante sockets. Aquí proporcionaremos una descripción detallada de cómo funciona el juego y cómo se implementa.
-![](https://image.lexica.art/full_jpg/f079a696-34a1-4ef8-9e26-bb81c4145100)
+<div align="center">
+  <img src="https://github.com/pablosierrafernandez/Juego-del-Caballero/blob/main/fight%20scene%20of%20two%20fantastical%20knights;%20action.jpg?raw=true" alt="Imagen"><br>
+  <small>Lexica Aperture v2</small>
+</div>
 
-								Lexica Aperture v2
 
-`
 
 ## Cliente
 
