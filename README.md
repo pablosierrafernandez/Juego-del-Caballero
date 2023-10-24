@@ -1,0 +1,2 @@
+# Juego del Caballero
+ Este es un juego de red implementado como una aplicación cliente/servidor en lenguaje C. El juego se llama "Juego del Caballero", y el objetivo es llevar un Datagrama IP desde un punto a otro en un tablero esquivando obstáculos. Tanto el cliente como el servidor funcionan como programas de terminal y se comunican mediante sockets. Aquí proporcionaremos una descripción detallada de cómo funciona el juego y cómo se implementa.
