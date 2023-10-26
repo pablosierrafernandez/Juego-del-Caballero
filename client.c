@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     struct DataClient package;
 
     package.id = generarIdAleatoria();
-    printf("Número aleatorio de 32 bits: %u\n", package.id);
+    printf("Hola soy el cliente %u\n", package.id);
 
     // Crear socket del cliente
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);

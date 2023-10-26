@@ -24,12 +24,8 @@ char board[ROWS][COLS] = {
     {' ', ' ', ' ', 'T', 'T'}
 };
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Uso: %s <Puerto del servidor>\n", argv[1]);
-        exit(1);
-    }
-    
+int ServerConnect(char *argv)
+{
 
     // Crear socket del servidor
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -42,7 +38,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
         server_addr.sin_family = AF_INET; 
         server_addr.sin_addr.s_addr = INADDR_ANY; 
-        server_addr.sin_port = htons(atoi(argv[1])); 
+        server_addr.sin_port = htons(atoi(argv)); 
     // Enlazar el socket a la dirección
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         perror("Error al enlazar el puerto");
@@ -54,9 +50,25 @@ int main(int argc, char *argv[]) {
         perror("Error al escuchar en el puerto");
         exit(4);
     }
+    return server_socket;
+}
 
+
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s <Puerto del servidor>\n", argv[1]);
+        exit(1);
+    }
+    // Lógica del juego y comunicación con el cliente
+    int lives = 3;
+    int row = 0;
+    int col = 0;
+    // Encender el servidor y guardar el numero de socket
+    int server_socket = ServerConnect(argv[1]);
     // *** Servidor Operativo ***
     fprintf(stderr, "Servidor operativo por el puerto %s\n", argv[1]);
+
     while (1) {
         // Aceptar conexiones de clientes
         int client_socket = accept(server_socket, NULL, NULL);
@@ -64,17 +76,11 @@ int main(int argc, char *argv[]) {
             perror("Error al aceptar la conexión del cliente");
             continue;
         }
-
-        // Lógica del juego y comunicación con el cliente
-        int lives = 3;
-        int row = 0;
-        int col = 0;
-
-        while (lives > 0) {
+        else if (lives > 0) {
             // Recibir el comando del cliente
             struct DataClient packClient;
             recv(client_socket, &packClient, sizeof(struct DataClient), 0);
-            printf("EL id del cliente %u y su respuesta: %c \n ",packClient.id,packClient.command);
+            printf("Soy el cliente %u y mi respuesta: %c el tamño del paquete es: %d \n ",packClient.id,packClient.command,sizeof(struct DataClient));
             printf("prueba fila %d prueba col %d\n",row, col);
             // Procesar el comando y actualizar la posición del caballero
             switch (packClient.command) {
