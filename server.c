@@ -17,7 +17,7 @@ struct DataClient
 
 // Definir el tablero inicial
 char board[ROWS][COLS] = {
-    {' ', ' ', ' ', 'P', 'S'},
+    {' ', 'P', ' ', 'P', 'S'},
     {'T', 'V', ' ', ' ', 'P'},
     {' ', 'T', ' ', 'T', ' '},
     {'P', ' ', 'T', ' ', 'V'},
@@ -79,9 +79,11 @@ int main(int argc, char *argv[]) {
         else if (lives > 0) {
             // Recibir el comando del cliente
             struct DataClient packClient;
+            char current_cell;
+            int colAux = col;
+            int rowAux = row;
             recv(client_socket, &packClient, sizeof(struct DataClient), 0);
             printf("Soy el cliente %u y mi respuesta: %c el tamño del paquete es: %d \n ",packClient.id,packClient.command,sizeof(struct DataClient));
-            printf("prueba fila %d prueba col %d\n",row, col);
             // Procesar el comando y actualizar la posición del caballero
             switch (packClient.command) {
                 case 'U':
@@ -107,9 +109,16 @@ int main(int argc, char *argv[]) {
                 char win_message = 'S';
                 send(client_socket, &win_message, sizeof(char), 0);
                 break;
+            } else if (board[row][col] == 'P') {
+                // El cliente se ha topado con la pared. Vuelve a la posicion inicial del turno.
+                current_cell = board[row][col];
+                send(client_socket, &current_cell, sizeof(char), 0);
+                row = rowAux;
+                col = colAux;
+                break;
             }
             // Enviar el estado actual del tablero al cliente
-            char current_cell = board[row][col];
+            current_cell = board[row][col];
             send(client_socket, &current_cell, sizeof(char), 0);
         }
 
