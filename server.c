@@ -3,25 +3,39 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <stdbool.h>
 
 // Tamaño del tablero
 #define ROWS 5
 #define COLS 5
+#define MAXPLAYERS 20
+#define MAXLIVES 3
 
-struct DataClient 
+struct DataClient
 {
     uint32_t id;
     char command;
+    int fila;
+    int columna;
 
 };
 
+struct Jugador
+{
+    uint32_t id;
+    int lives;
+    int row;
+    int col;
+};
+struct Jugador jugadores[MAXPLAYERS];
+
 // Definir el tablero inicial
 char board[ROWS][COLS] = {
-    {' ', 'P', ' ', 'P', 'S'},
-    {'T', 'V', ' ', ' ', 'P'},
-    {' ', 'T', ' ', 'T', ' '},
-    {'P', ' ', 'T', ' ', 'V'},
-    {' ', ' ', ' ', 'T', 'T'}
+        {' ', ' ', 'T', ' ', 'S'},
+        {' ', ' ', 'P', ' ', 'P'},
+        {'T', 'V', ' ', 'T', ' '},
+        {'P', 'T', 'T', ' ', 'V'},
+        {' ', ' ', ' ', 'T', 'T'}
 };
 
 int ServerConnect(char *argv)
@@ -36,9 +50,9 @@ int ServerConnect(char *argv)
 
     // Configurar la dirección del servidor
     struct sockaddr_in server_addr;
-        server_addr.sin_family = AF_INET; 
-        server_addr.sin_addr.s_addr = INADDR_ANY; 
-        server_addr.sin_port = htons(atoi(argv)); 
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(atoi(argv));
     // Enlazar el socket a la dirección
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         perror("Error al enlazar el puerto");
@@ -53,6 +67,111 @@ int ServerConnect(char *argv)
     return server_socket;
 }
 
+//Comprobar si el jugador esta registrado
+bool isPlayerRegistered(struct DataClient packClient){
+    for (int i = 0; i < MAXPLAYERS; ++i) {
+        if (jugadores[i].id == packClient.id){
+            return true;
+        }
+    }
+    return false;
+}
+
+//Obtener la posicion del array de clientes
+int getClientNumber(struct DataClient packClient){
+    for (int i = 0; i < MAXPLAYERS; ++i) {
+        if (jugadores[i].id == packClient.id){
+            return i;
+        }
+    }
+    return -1;
+}
+
+//Registrar a un jugador e inicializar sus vidas y posicion
+int registerPlayer(int client_socket, uint32_t id){
+    for (int i = 0; i < MAXPLAYERS; ++i) {
+        if (jugadores[i].id == 0){
+            jugadores[i].id = id;
+            jugadores[i].lives = MAXLIVES;
+            jugadores[i].row = 0;
+            jugadores[i].col = 0;
+            return i;
+        }
+    }
+    return -1;
+}
+
+//Comprobar si el jugador esta vivo
+bool isPlayerAlive(int clientNumber){
+    if (jugadores[clientNumber].lives > 0){
+        return true;
+    }
+    return false;
+}
+
+//Ver hacia donde se dirige
+char whereIsGoingTo(int clientNumber, char command){
+    int row = jugadores[clientNumber].row;
+    int col = jugadores[clientNumber].col;
+    switch (command) {
+        case 'U':
+            if (row > 0) row--;
+            else return 'P';
+            break;
+        case 'D':
+            if (row < ROWS - 1) row++;
+            else return 'P';
+            break;
+        case 'L':
+            if (col > 0) col--;
+            else return 'P';
+            break;
+        case 'R':
+            if (col < COLS - 1) col++;
+            else return 'P';
+            break;
+    }
+    return board[row][col];
+}
+
+//Actualizar la posicion del jugador
+void setPosition(int clientNumber, char command){
+    switch (command) {
+        case 'U':
+            if (jugadores[clientNumber].row > 0) jugadores[clientNumber].row--;
+            else (printf("El cliente %u no puede ir hacia arriba\n", jugadores[clientNumber].id));
+            break;
+        case 'D':
+            if (jugadores[clientNumber].row < ROWS - 1) jugadores[clientNumber].row++;
+            else (printf("El cliente %u no puede ir hacia abajo\n", jugadores[clientNumber].id));
+            break;
+        case 'L':
+            if (jugadores[clientNumber].col > 0) jugadores[clientNumber].col--;
+            else (printf("El cliente %u no puede ir hacia izquierda\n", jugadores[clientNumber].id));
+            break;
+        case 'R':
+            if (jugadores[clientNumber].col < COLS - 1) jugadores[clientNumber].col++;
+            else (printf("El cliente %u no puede ir hacia derecha\n", jugadores[clientNumber].id));
+            break;
+    }
+}
+
+//Mostrar el tablero con el jugador
+void printBoard(int clientNumber){
+    for (int i = 0; i < ROWS; ++i) {
+        printf("|");
+        for (int j = 0; j < COLS; ++j) {
+            if (i == jugadores[clientNumber].row && j == jugadores[clientNumber].col){
+                printf("K");
+            }else{
+                printf("%c", board[i][j]);
+            }
+            printf("|");
+        }
+        printf("\n");
+    }
+}
+
 
 
 int main(int argc, char *argv[]) {
@@ -61,69 +180,101 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     // Lógica del juego y comunicación con el cliente
-    int lives = 3;
-    int row = 0;
-    int col = 0;
+    int currentClientSocket = 0;
+    int currentRow = 0;
+    int currentCol = 0;
+
+    //Para guardar los paquetes recibidos
+    struct DataClient packClient;
+
     // Encender el servidor y guardar el numero de socket
     int server_socket = ServerConnect(argv[1]);
     // *** Servidor Operativo ***
     fprintf(stderr, "Servidor operativo por el puerto %s\n", argv[1]);
 
     while (1) {
+
         // Aceptar conexiones de clientes
+        printf("Esperando conexiones de clientes...\n");
         int client_socket = accept(server_socket, NULL, NULL);
+        printf("Conexión aceptada\n");
         if (client_socket == -1) {
             perror("Error al aceptar la conexión del cliente");
             continue;
         }
-        else if (lives > 0) {
-            // Recibir el comando del cliente
-            struct DataClient packClient;
-            char current_cell;
-            int colAux = col;
-            int rowAux = row;
-            recv(client_socket, &packClient, sizeof(struct DataClient), 0);
-            printf("Soy el cliente %u y mi respuesta: %c el tamño del paquete es: %d \n ",packClient.id,packClient.command,sizeof(struct DataClient));
-            // Procesar el comando y actualizar la posición del caballero
-            switch (packClient.command) {
-                case 'U':
-                    if (row > 0) row--;
+
+        // Recibir el comando del cliente
+        recv(client_socket, &packClient, sizeof(struct DataClient), 0);
+        printf("El cliente %u envió el comando %c\n", packClient.id, packClient.command);
+
+        //Registrar cliente si no lo esta
+        if (!isPlayerRegistered(packClient)){
+            currentClientSocket = registerPlayer(client_socket, packClient.id);
+        }else{
+            currentClientSocket = getClientNumber(packClient);
+        }
+
+
+
+        //Comprobar si el jugador esta vivo
+        if(!isPlayerAlive(currentClientSocket)){
+            //Enviar respuesta 'D' al cliente y posicion actual
+            packClient.command = 'D';
+            packClient.fila = jugadores[currentClientSocket].row;
+            packClient.columna = jugadores[currentClientSocket].col;
+            send(client_socket, &packClient, sizeof(struct DataClient), 0);
+        }else{
+            switch(whereIsGoingTo(currentClientSocket, packClient.command)){
+                case ' ':
+
+                    //Enviar respuesta 'D' al cliente y posicion actual
+                    setPosition(currentClientSocket, packClient.command);
+                    packClient.command = ' ';
+                    packClient.fila = jugadores[currentClientSocket].row;
+                    packClient.columna = jugadores[currentClientSocket].col;
+                    send(client_socket, &packClient, sizeof(struct DataClient), 0);
                     break;
-                case 'D':
-                    if (row < ROWS - 1) row++;
+                case 'T':
+                    //Enviar respuesta 'T' al cliente y posicion actual
+                    setPosition(currentClientSocket, packClient.command);
+                    packClient.command = 'T';
+                    packClient.fila = jugadores[currentClientSocket].row;
+                    packClient.columna = jugadores[currentClientSocket].col;
+                    jugadores[currentClientSocket].lives--;
+                    send(client_socket, &packClient, sizeof(struct DataClient), 0);
                     break;
-                case 'L':
-                    if (col > 0) col--;
+                case 'P':
+                    //Enviar respuesta 'P' al cliente y posicion actual
+                    packClient.command = 'P';
+                    packClient.fila = jugadores[currentClientSocket].row;
+                    packClient.columna = jugadores[currentClientSocket].col;
+                    send(client_socket, &packClient, sizeof(struct DataClient), 0);
                     break;
-                case 'R':
-                    if (col < COLS - 1) col++;
+                case 'S':
+                    //Enviar respuesta 'S' al cliente y posicion actual
+                    setPosition(currentClientSocket, packClient.command);
+                    packClient.command = 'S';
+                    packClient.fila = jugadores[currentClientSocket].row;
+                    packClient.columna = jugadores[currentClientSocket].col;
+                    send(client_socket, &packClient, sizeof(struct DataClient), 0);
+                    break;
+                case 'V':
+                    //Enviar respuesta 'V' al cliente y posicion actual
+                    setPosition(currentClientSocket, packClient.command);
+                    packClient.command = 'V';
+                    packClient.fila = jugadores[currentClientSocket].row;
+                    packClient.columna = jugadores[currentClientSocket].col;
+                    send(client_socket, &packClient, sizeof(struct DataClient), 0);
                     break;
             }
-            // Actualizar las vidas según la casilla actual
-            if (board[row][col] == 'T') {
-                lives--;
-            } else if (board[row][col] == 'V') {
-                lives++;
-            } else if (board[row][col] == 'S') {
-                // El cliente ganó el juego
-                char win_message = 'S';
-                send(client_socket, &win_message, sizeof(char), 0);
-                break;
-            } else if (board[row][col] == 'P') {
-                // El cliente se ha topado con la pared. Vuelve a la posicion inicial del turno.
-                current_cell = board[row][col];
-                send(client_socket, &current_cell, sizeof(char), 0);
-                row = rowAux;
-                col = colAux;
-                break;
-            }
-            // Enviar el estado actual del tablero al cliente
-            current_cell = board[row][col];
-            send(client_socket, &current_cell, sizeof(char), 0);
+
         }
 
         // Cerrar el socket del cliente
+        printBoard(currentClientSocket);
         close(client_socket);
+
+        printf("Cerrando socket del cliente %u\n", packClient.id);
     }
 
     // Cerrar el socket del servidor

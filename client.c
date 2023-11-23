@@ -1,7 +1,3 @@
-/* CLIENT */
-/* Es tracta d'un exemple per als professors */
-/* Als estudiants els posarem un esquelet */
-
 /* Inclusio de fitxers .h habituals */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,10 +15,15 @@
 
 #define MIDA_BUFFER 1024
 
-struct DataClient 
+//Matriz para que vaya apuntando los resultados
+char matriz[5][5];
+
+struct DataClient
 {
     uint32_t id;
     char command;
+    int fila;
+    int columna;
 
 };
 
@@ -37,8 +38,29 @@ uint32_t generarIdAleatoria() {
         uint32_t aleatorio8Bits = rand() & 0xFF; // Genera un número aleatorio de 8 bits
         randomNum = (randomNum << 8) | aleatorio8Bits; // Combina los bits
     }
-
     return randomNum;
+}
+
+//Registrar resultado en la matriz
+void apuntaCasilla(char casilla, int row, int col){
+    matriz[row][col] = casilla;
+}
+
+//Imprimir matriz tablero de juego y posicion del jugador
+void printMatriz(){
+    for(int i = 0; i < 5; i++){
+        printf("|");
+        for(int j = 0; j < 5; j++){
+            if(matriz[i][j] == 'T'){
+                printf("T|");
+            }else{
+                printf(" |");
+            }
+        }
+        printf("\n");
+    }
+
+
 }
 
 int main(int argc, char *argv[]) {
@@ -48,48 +70,55 @@ int main(int argc, char *argv[]) {
 
     package.id = generarIdAleatoria();
     printf("Hola soy el cliente %u\n", package.id);
-
     // Crear socket del cliente
-    int client_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_socket == -1) {
-        perror("Error al crear el socket del cliente");
-        exit(2);
-    }
+    int client_socket;
 
-    // Definir la dirección del servidor
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(atoi(argv[2]));
-    inet_pton(AF_INET, argv[1], &server_addr.sin_addr);
-
-    // Conectar al servidor
-    if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Error al conectar al servidor");
-        exit(3);
-    }
-
-        // Implementa la lógica del juego y la comunicación con el servidor aquí
-        // Envía comandos al servidor y recibe respuestas
-
+    while(1){
         // Leer el comando del usuario (U, D, L, R)
         printf("Ingrese un comando (U, D, L, R): ");
         scanf(" %c", &package.command);
 
+        client_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (client_socket == -1) {
+            perror("Error al crear el socket del cliente");
+            exit(2);
+        }
+
+        // Definir la dirección del servidor
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(atoi(argv[2]));
+        inet_pton(AF_INET, argv[1], &server_addr.sin_addr);
+
+        // Conectar al servidor
+        if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+            perror("Error al conectar al servidor");
+            exit(3);
+        }
+
+        // Implementa la lógica del juego y la comunicación con el servidor aquí
+        // Envía comandos al servidor y recibe respuestas
+
+
         // Enviar el comando al servidor
+        printf("Enviando comando...\n");
         send(client_socket, &package, sizeof(struct DataClient), 0);
 
         // Recibir la respuesta del servidor
-        recv(client_socket, &response, sizeof(char), 0);
+        printf("Esperando respuesta...\n");
+        recv(client_socket, &package, sizeof(struct DataClient), 0);
+
 
         // Procesar la respuesta
-        switch (response) {
+        switch (package.command) {
             case ' ': // Casilla libre
                 printf("Casilla libre. Continúa.\n");
                 break;
             case 'T': // Casilla con trampa
                 printf("¡Has caído en una trampa! Pierdes una vida.\n");
+                apuntaCasilla('T', package.fila, package.columna);
                 break;
             case 'P': // Casilla de pared
-                printf("No puedes pasar. Elige otro camino.\n");
+                printf("¡Ouch! Te has estampado contra una pared.\n");
                 break;
             case 'V': // Casilla que incrementa una vida
                 printf("¡Has encontrado una vida extra!\n");
@@ -98,10 +127,16 @@ int main(int argc, char *argv[]) {
                 printf("DATAGRAMA ENTREGADO!! Has ganado el juego.\n");
                 close(client_socket); // Cerrar el socket
                 exit(0);
+            case 'D':
+                printf("Estas muerto\n");
+                close(client_socket); // Cerrar el socket
+                exit(0);
         }
 
-
+        printMatriz();
         // Cierra el socket del cliente
         close(client_socket);
-        return 0;
     }
+
+    return 0;
+}
